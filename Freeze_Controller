@@ -1,0 +1,230 @@
+public class Freeze_Controller{ 
+      
+    @AuraEnabled
+    public static ApiResponse liftFreezeProcess(String strParams, String strChannel, String strPurpose, String strStampDate, 
+                                                String strConsumerSessionId, String strAccountId, String strXtrackerval){
+        
+        System.debug('$$$LiftPermanentRemowalFreezeSession');
+        ApiResponse response = new ApiResponse();
+        
+        Cuda_CreateConsumerSession liftFreezeProcess = new Cuda_CreateConsumerSession();
+        
+        liftFreezeProcess.purpose = strPurpose;
+        liftFreezeProcess.channel = strChannel;
+        liftFreezeProcess.stampDate = strStampDate;
+        
+        System.debug('$$$consumerSessionId ' + strConsumerSessionId);
+        
+        HttpResponse res = new HttpResponse();
+        res = CUDA_RestApiClient_R1.liftFreezeThruCaps(strConsumerSessionId, strXtrackerval);
+        
+        System.debug('$$$Status Code:'+res.getStatusCode());
+        
+        if(res.getStatusCode() == 200){
+            List<String> lstParagraphIds = new List<String>();
+            Cuda_CreateConsumerSession.FreezeJsonResponse freezeJsonResponse = new Cuda_CreateConsumerSession.FreezeJsonResponse();
+            FreezeJsonResponse freezeJson = (FreezeJsonResponse) System.JSON.deserialize(res.getBody(),FreezeJsonResponse.class);
+            response.lstApiResponse = freezeJson.recommendedParagraphIds;
+            response.strFreezePin = freezeJson.freezePin;
+            System.debug('$$$response.lstApiResponse:' + response.lstApiResponse);
+            response.strErrorCode = String.valueOf(res.getStatusCode());
+            
+            //Update the Freeze Pin in Salesforce Database
+            String newFreezePin = '';
+            FreezeManagementController.updateFreezePin(strAccountId, newFreezePin);
+            
+        }else{
+            response.blnIsSuccess = false;
+            response.strErrorCode = String.valueOf(res.getStatusCode());
+        }
+        
+        return response; 
+    }
+    
+    /**
+     * @author     Shravan Masam
+     * @description To create Consumer Session Id in Add Freeze Process
+     * @see
+     * @param       Account Data, VisitType, Purpose, StampDate, String strXtrackerVal
+     * @return      RemoteResponse_R1 
+     */
+    
+    @AuraEnabled
+    public static ApiResponse thawRemovalProcess(String strParams, String strChannel, String strPurpose, String strStampDate, 
+                                                 String strConsumerSessionId, String strXtrackerval){
+        
+        System.debug('$$$thawRemovalProcess');
+        
+        ApiResponse response = new ApiResponse();
+        
+        ThawRemoval objConsumerThawRemoval =  (ThawRemoval) System.JSON.deserialize(strParams, ThawRemoval.class);
+        
+        System.debug('$$$objConsumerThawRemoval Start Date:' + objConsumerThawRemoval.strThawStart);
+        System.debug('$$$objConsumerThawRemoval End Date  :' + objConsumerThawRemoval.strThawEnd);
+        
+        Cuda_CreateConsumerSession thawRemovalProcess = new Cuda_CreateConsumerSession();
+        
+        thawRemovalProcess.purpose = strPurpose;
+        thawRemovalProcess.channel = strchannel;
+        thawRemovalProcess.stampDate = strStampDate;
+        
+        Cuda_CreateConsumerSession.thawRemoval thawRemovalBody = new Cuda_CreateConsumerSession.thawRemoval();
+        
+        thawRemovalBody.thawStart = objConsumerThawRemoval.strThawStart;    
+        thawRemovalBody.thawEnd = objConsumerThawRemoval.strThawEnd;
+        
+        System.debug('$$$SessionID :' + strConsumerSessionId);
+        
+        String body = System.JSON.serialize(thawRemovalBody);
+        
+        System.debug('$$$body :' + body); 
+        System.debug('$$$consumerSessionId ' + strConsumerSessionId);
+        
+        HttpResponse res = new HttpResponse();
+        res = CUDA_RestApiClient_R1.thawRemovalThruCaps(body, strConsumerSessionId, strXtrackerval);
+        
+        System.debug('$$$Status Code:'+res.getStatusCode());
+        
+        if(res.getStatusCode() == 200){
+            List<String> lstParagraphIds = new List<String>();
+            Cuda_CreateConsumerSession.FreezeJsonResponse freezeJsonResponse = new Cuda_CreateConsumerSession.FreezeJsonResponse();
+            FreezeJsonResponse freezeJson = (FreezeJsonResponse) System.JSON.deserialize(res.getBody(),FreezeJsonResponse.class);
+            response.lstApiResponse = freezeJson.recommendedParagraphIds;
+            response.strFreezePin = freezeJson.freezePin;
+            System.debug('$$$response.lstApiResponse:' + response.lstApiResponse);
+            response.strErrorCode = String.valueOf(res.getStatusCode());
+        }else{
+            response.blnIsSuccess = false;
+            response.strErrorCode = String.valueOf(res.getStatusCode());
+        }
+        
+        return response; 
+    }
+    
+    /**
+     * @author     Shravan Masam
+     * @description To create Consumer Session Id in Add Freeze Process
+     * @see
+     * @param       Account Data, VisitType, Purpose, StampDate, String strXtrackerVal
+     * @return      RemoteResponse_R1 
+     */
+    
+    
+    //Pin replacement API call
+    
+    @AuraEnabled
+    public static ApiResponse pinReplacementProcess(String strParams, String strChannel, String strPurpose, String strStampDate, 
+                                                    String strConsumerSessionId, String strAccountId, String strXtrackerval){
+        
+        System.debug('$$$pinReplacementProcess');
+        
+        ApiResponse response = new ApiResponse();
+        
+        pinReplacement objPinReplacement =  (pinReplacement) System.JSON.deserialize(strParams, pinReplacement.class);
+        
+        System.debug('$$$objPinReplacement Pin Replacement:' + objPinReplacement.strFreezePin);
+        
+        Cuda_CreateConsumerSession pinReplacementProcess = new Cuda_CreateConsumerSession();
+        
+        pinReplacementProcess.purpose = strPurpose;
+        pinReplacementProcess.channel = strChannel;
+        pinReplacementProcess.stampDate = strStampDate;
+        
+        Cuda_CreateConsumerSession.pinReplacement pinReplacementBody = new Cuda_CreateConsumerSession.pinReplacement();
+        
+        pinReplacementBody.freezePin = objPinReplacement.strFreezePin;
+        
+        System.debug('$$$SessionID :' + strConsumerSessionId);
+        
+        String body = System.JSON.serialize(pinReplacementBody);
+        
+        System.debug('$$$body :' + body); 
+        System.debug('$$$consumerSessionId ' + strConsumerSessionId);
+        
+        HttpResponse res = new HttpResponse();
+        res = CUDA_RestApiClient_R1.thawRemovalThruCaps(body, strConsumerSessionId, strXtrackerval);
+        
+        System.debug('$$$Status Code:'+res.getStatusCode());
+        
+        if(res.getStatusCode() == 200){
+            List<String> lstParagraphIds = new List<String>();
+            Cuda_CreateConsumerSession.FreezeJsonResponse freezeJsonResponse = new Cuda_CreateConsumerSession.FreezeJsonResponse();
+            FreezeJsonResponse freezeJson = (FreezeJsonResponse) System.JSON.deserialize(res.getBody(),FreezeJsonResponse.class);
+            response.lstApiResponse = freezeJson.recommendedParagraphIds;
+            response.strFreezePin = freezeJson.freezePin;
+            System.debug('$$$response.lstApiResponse:' + response.lstApiResponse);
+            response.strErrorCode = String.valueOf(res.getStatusCode());
+            
+            //Update the Freeze Pin in Salesforce Database
+            String newFreezePin = freezeJson.freezePin;
+            FreezeManagementController.updateFreezePin(strAccountId, newFreezePin);
+        }else{
+            response.blnIsSuccess = false;
+            response.strErrorCode = String.valueOf(res.getStatusCode());
+        }
+        
+        return response; 
+    }
+    
+    //Create Consumer Session ID for Cancel Temporary Freeze
+    
+    @AuraEnabled
+    public static RemoteResponse_R1 createConsumerSession(String strParams, String strVisitType, String strPurpose, 
+                                                          String strStampDate, String strXtrackerval){
+        system.debug('$$$ createConsumerSession for Cancel Temporary Freeze');
+        
+        RemoteResponse_R1 response = Freeze_Wrapper_Controller.createConsumerSession(strParams, strVisitType, strPurpose, strStampDate,strXtrackerval);
+        
+        return response;
+    }
+    
+    //Place freeze in the process of Cancel Temporary Freeze
+    
+    @AuraEnabled
+    public static ApiResponse placeFreezeSession(String strParams, String strConsumerSessionId, String strAccountId, String strXtrackerval){
+        system.debug('$$$ placeFreezeSession for Cancel Temporary Freeze');
+        
+        ApiResponse response = FreezeManagementController.placeFreezeSession(strParams, strConsumerSessionId, strAccountId, strXtrackerval);
+        
+        return response;
+    }
+    
+    @AuraEnabled
+    public static ApiResponse sendNotificationToHostOrLocal(String strParams, String strLocalOrHost, String strConsumerSessionId, String strXTrackerVal){
+        system.debug('$$$ SendNotificationToHostOrLocal for Add Freeze');
+        
+        ApiResponse response = new ApiResponse();
+        
+        response = FreezeEmailNotification.sendNotificationToHostOrLocal(strParams, strLocalOrHost, strConsumerSessionId,strXTrackerVal);
+        
+        return response;
+    }
+    
+    public class FreezeJsonResponse {
+        public String freezePin         {get;set;}
+        public List<String> recommendedParagraphIds  {get;set;}
+        
+    }
+    
+    //Thaw Remowal
+    
+    public class ThawRemoval{
+        public String strThawStart  {get; set;}
+        public String strThawEnd    {get; set;}
+    }
+    
+    public class pinReplacement{
+        public String strFreezePin  {get; set;}
+    }
+    
+    public Class SendNotificationToHL{
+        
+        public String strType {get;set;}
+        public String strDelivery {get;set;}
+        public String strPrinterId {get;set;} 
+        public String strFreezePin {get;set;} 
+        public List<String> strParagraphIds {get;set;} 
+        
+    }
+    
+}
