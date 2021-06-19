@@ -1,0 +1,50 @@
+/******************************************************************************************
+*  Description         : DMCC - ServiceRequestTrigger Dispather - Handels to call appropriate logic based on the events of step record
+*  Author/Created      : Vaishali K
+*  Date                : 20-12-2015                          
+----------------------------------------------------------------------
+Version  Date         Author             Remarks                                                 
+=======   ==========   =============  ==================================
+
+
+************************************************************************************************/
+public class AccountTriggerDispatcher extends TriggerDispatcherBase {
+    private static Boolean isBeforeInsertProcessing = false;
+    private static Boolean isBeforeUpdateProcessing = false;
+    private static Boolean isAfterInsertProcessing = false;
+    private static Boolean isAfterUpdateProcessing = false; 
+    
+    // handels call for before insert event
+    public virtual override void beforeInsert(TriggerParameters tp) {
+       if(!isBeforeInsertProcessing) {
+            //execute(new SRBeforeInsertTriggerHandler(),tp,TriggerParameters.TriggerEvent.beforeInsert);
+        }
+        else execute(null, tp, TriggerParameters.TriggerEvent.beforeInsert);
+    }
+    // handels call for before Update event 
+    public virtual override void beforeUpdate(TriggerParameters tp) {
+      if(!isBeforeUpdateProcessing) {
+            //execute(new SRBeforeUpdateTriggerHandler(),tp,TriggerParameters.TriggerEvent.beforeUpdate);
+       }
+      else execute(null, tp, TriggerParameters.TriggerEvent.BeforeUpdate);
+    }
+    
+    // handels call for after insert event
+    public virtual override void afterInsert(TriggerParameters tp) {
+       if(!isAfterInsertProcessing) {
+            isAfterInsertProcessing = true;
+           //execute(new SRAfterInsertTriggerHandler(), tp, TriggerParameters.TriggerEvent.afterInsert);
+            isAfterInsertProcessing = false;
+       }
+        else execute(null, tp, TriggerParameters.TriggerEvent.afterInsert);
+    }
+    
+    // handels call for after update event
+    public virtual override void afterUpdate(TriggerParameters tp) {
+        if(!isAfterUpdateProcessing) {
+            //execute(new SRAfterUpdateTriggerHandler (), tp, TriggerParameters.TriggerEvent.afterUpdate);
+        }
+        else execute(null, tp, TriggerParameters.TriggerEvent.afterUpdate);
+    }
+    
+}
