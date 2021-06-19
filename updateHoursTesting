@@ -1,0 +1,138 @@
+public void updateHoursTesting(list<Case>newList,map<id,Case>oldCaseMap){ 
+        
+        List<Holiday> holidayList = new List<Holiday>();
+        list<Case> caseUpdated = new List<case>();
+        
+        Set <String> CaseIds = new Set <String>();      
+        Double  qualifiedHours;               
+        Decimal qHours;  
+        decimal Days;
+        Date myDate1;
+        Date myDate;
+        DateTime dts;
+        
+        Boolean IsCaseQualified = FALSE; 
+        Boolean IsCaseDeveloping = FALSE;
+        Boolean IsCaseTesting = FALSE;
+        
+        BusinessHours bHours = [SELECT Id FROM BusinessHours WHERE IsDefault = true];
+        
+        
+        for(Case caseRec : newList){
+            CaseIds.add(caseRec.Id);
+        }        
+        List<Case> caseList = [SELECT Id, Status, OwnerId, CreatedDate,SaleOps_Team_Bus_Hours__c,BUhours_Testing_DateTime__c,LastModifiedDate 
+                               FROM Case Where Id IN: CaseIds];    
+        List<Holiday> holidays=[Select h.StartTimeInMinutes, h.Name, h.ActivityDate From Holiday h where 
+                                h.ActivityDate >= :myDate1 AND h.ActivityDate <= :myDate];
+        Integer numOfHolidays = holidays.size();      
+        
+        if(!caseList.isEmpty()){         
+            
+            for(case cs : caseList){                               
+                //fetching the Created Date for the Case and converted into Long        
+                Long timeCreatedDate = cs.CreatedDate.getTime();
+                
+                //Validating the Status as Qualified and owner is to be changed at this stage
+                if(cs.Status == 'Qualified' && oldCaseMap.get(cs.Id).Status =='Assigned' && cs.OwnerId == oldCaseMap.get(cs.Id).Ownerid){
+                    
+                    //Getting the lastModified Date for the case when the Status is Qualified and converted to Date
+                    DateTime dateCreated = cs.CreatedDate;
+                    myDate1 = date.newinstance(dateCreated.year(), dateCreated.month(), dateCreated.day());
+                    
+                    //Getting the lastModified Date for the case when the Status is Qualified and converted to Date
+                    DateTime modifiedDate = cs.LastModifiedDate;
+                    myDate = date.newinstance(modifiedDate.year(), modifiedDate.month(), modifiedDate.day());
+                    
+                    Integer calculateNonWorkingDays  = calculateNonWorkingDays(myDate1, myDate);
+                    System.debug('$$$$calculateNonWorkingDays :' +calculateNonWorkingDays);
+                    
+                    Boolean bh =  BusinessHours.isWithin(bHours.Id, myDate);  
+                    System.debug('$$$$BusinessHours :' +bh);
+                    
+                    Long caseModifiedDate = cs.LastModifiedDate.getTime();                    
+                    Long milliSeconds =     (caseModifiedDate -  timeCreatedDate);
+                    qualifiedHours = milliSeconds/3600000;    
+                    Days = qualifiedHours/24;
+                    
+                    if( bh  && qualifiedHours != Null){
+                        Days = (Days - calculateNonWorkingDays - numOfHolidays)*24;
+                        // qHours = qualifiedHours ;
+                        System.debug('Days : ' +Days);
+                        IsCaseQualified = TRUE;
+                    }
+                    
+                }                 
+                
+                //Validating the Status as Qualified and owner is to be changed at this stage
+                if(cs.Status == 'Testing' && oldCaseMap.get(cs.Id).Status =='Developing' && cs.OwnerId == oldCaseMap.get(cs.Id).Ownerid){
+                    System.debug('$$Inside Testing Loop');                
+                    //Getting the lastModified Date for the case when the Status is Qualified and converted to Date
+                    DateTime modifiedDateTesting = cs.LastModifiedDate;
+                    myDate = date.newinstance(modifiedDateTesting.year(), modifiedDateTesting.month(), modifiedDateTesting.day());
+                    
+                    Boolean bh =  BusinessHours.isWithin(bHours.Id, myDate);  
+                    System.debug('$$$$BusinessHours :' +bh);
+                    
+                    
+                    if(bh){
+                        dts =  modifiedDateTesting;
+                        IsCasedeveloping = TRUE;
+                        System.debug('dts : ' +dts);
+                        System.debug('modifiedDateTesting :' +modifiedDateTesting);  
+                    }
+                }
+                
+                //Validating the Status as Qualified and owner is to be changed at this stage
+                if(cs.Status == 'Testing' && oldCaseMap.get(cs.Id).Status =='Testing' && cs.OwnerId == oldCaseMap.get(cs.Id).Ownerid){
+                    If(oldCaseMap.get(cs.Id).BUhours_Testing_DateTime__c != null  && oldCaseMap.get(cs.Id).SaleOps_Team_Bus_Hours__c != null){
+                        
+                        DateTime prevModifiedDate =  oldCaseMap.get(cs.Id).BUhours_Testing_DateTime__c;
+                        DateTime modifiedDateTesting = cs.LastModifiedDate;                        
+                        myDate = date.newinstance(modifiedDateTesting.year(), modifiedDateTesting.month(), modifiedDateTesting.day());                        
+                        
+                        Integer calculateNonWorkingDays  = calculateNonWorkingDays(myDate1, myDate);
+                        System.debug('$$$$calculateNonWorkingDays :' +calculateNonWorkingDays);
+                        Boolean bh =  BusinessHours.isWithin(bHours.Id, myDate);
+                        
+                        Long caseModifiedDate = cs.LastModifiedDate.getTime();  
+                        Long prevModifiedDate1 = prevModifiedDate.getTime();
+                        Long milliSeconds =     (caseModifiedDate -  prevModifiedDate1);
+                        qualifiedHours = milliSeconds/3600000;    
+                        Days = qualifiedHours/24;
+                        if( bh  && qualifiedHours != Null){
+                            Days =  (Days - calculateNonWorkingDays )*24;
+                            // qHours = qualifiedHours ;
+                            System.debug('Days : ' +Days);
+                            IsCaseTesting = TRUE;
+                        }
+                    }
+                }
+                
+                //Validating to Updtae the Record
+                if( IsCaseQualified){
+                    caseUpdated.add( new Case(Id = cs.Id, SaleOps_Team_Bus_Hours__c = Days));
+                }    
+                //Validating to Updtae the Record
+                if(IsCasedeveloping){
+                    caseUpdated.add( new Case(Id = cs.Id, BUhours_Testing_DateTime__c = dts));
+                }  
+                //Validating to Updtae the Record
+                if( IsCaseTesting){
+                    caseUpdated.add( new Case(Id = cs.Id, 
+                                              SaleOps_Team_Bus_Hours__c = oldCaseMap.get(cs.Id).SaleOps_Team_Bus_Hours__c + Days));
+                } 
+                
+            }
+            
+            IsCaseQualified = FALSE;
+            IsCaseDeveloping = FALSE;
+            IsCaseDeveloping = TRUE;
+        }           
+        
+        if(!caseUpdated.isEmpty()){
+            update caseUpdated;
+            System.debug('caseUpdated :' +caseUpdated); 
+        }
+        
+    }
