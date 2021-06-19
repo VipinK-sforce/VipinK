@@ -1,0 +1,339 @@
+<aura:component controller="MTM_CredentialRequirementController" implements="forceCommunity:availableForAllPageTypes" access="global" >
+    
+    <!-- style and script includes -->
+    <ltng:require styles="{!$Resource.FontAwesome + '/font-awesome-4.7.0/css/font-awesome.min.css'}"
+                  scripts="{!$Resource.Bootstrap + '/Bootstrap/jquery.min.js'}"/>
+    
+    <!-- Client Hierarchy Provider Type for which Data is displayed in the table -->
+    <aura:attribute name="chProviderType" type="Object" />
+    <aura:attribute name="objectType" type="String" />
+    <aura:attribute name="recordId" type="String" />
+    
+    <aura:attribute name="isShowCollapse" type="boolean" default="true" />
+    
+    <!-- List of Records to be displayed in the table  -->
+    <aura:attribute name="allRecords" type="Object[]"/>
+    <aura:attribute name="searchedRecords" type="Object[]" description="Filter result subset of search records."/>
+    <aura:attribute name="statusFilterRecords" type="Object[]" description="All records retrieved from status filter."/>
+    
+	<!-- List of Records after dropdown filters applied -->
+    <aura:attribute name="filteredrecords" type="Object[]"/>
+    
+	<!-- List of Records after searching -->
+    <aura:attribute name="searchRecords" type="Object[]" description="Search result subset of all records."/>
+    
+	<!-- List of Records for current page -->
+    <aura:attribute name="records" type="Object[]"/>
+    <aura:attribute name="searchFields" type="String[]"
+                    default="['CredentialRequirement__r.MasterCredential__r.Name', 'DeadlineDate__c', 'EffectiveBeginDate__c', 'EffectiveEndDate__c']"/>
+    
+    <!-- This will contain Field Name on which Table is sorted currently -->
+    <aura:attribute name="currentSortField" type="String"/>
+    
+    <!-- if Set to True Panel will be closed -->
+    <aura:attribute name="isPanelClosed" type="boolean" default="false" />
+    
+    <!-- Selected Status from the Dropdown -->
+    <aura:attribute name="selectedStatus" type="String" default="All" />
+    
+    <!-- Selected Expires Within from the Dropdown -->
+    <aura:attribute name="selectedExpiresWithIn" type="String" default="All" />
+    
+    <!-- Current Page -->
+    <aura:attribute name="page" type="integer" default="1"/>
+    <!-- Total Pages -->
+    <aura:attribute name="pages" type="integer" default="0"/>
+    <!-- Total Number of Records -->
+    <aura:attribute name="total" type="integer" default="0"/>
+    <!-- Page Size -->
+    <aura:attribute name="pageSize" type="String" default="10" />
+    
+    <!-- if set to True, Loading image will be displayed -->
+    <aura:attribute name="isLoading" type="boolean" default="false" />
+    
+    <aura:attribute name="companyApprovedCount" type="Integer" default="0" />
+    <aura:attribute name="companyExpiredCount" type="Integer" default="0" />
+    <aura:attribute name="companySubmittedCount" type="Integer" default="0" />
+    
+    <aura:attribute name="vehicleApprovedCount" type="Integer" default="0" />
+    <aura:attribute name="vehicleExpiredCount" type="Integer" default="0" />
+    <aura:attribute name="vehicleSubmittedCount" type="Integer" default="0" />
+    
+    <aura:attribute name="personnelApprovedCount" type="Integer" default="0" />
+    <aura:attribute name="personnelExpiredCount" type="Integer" default="0" />
+    <aura:attribute name="personnelSubmittedCount" type="Integer" default="0" />
+    
+    <aura:attribute name="OverallStatus" type="String" default="" />
+    
+    <!-- Added by Abhishek to populate the Roles dropdown -->
+    <aura:attribute name="roles" type="String[]"/>
+    <aura:attribute name="roleSelected" type="String"   />
+    <aura:attribute name="showClientHierarchy" type="boolean" default="true" />
+    <aura:attribute name="companyDetailInfo" type="String" default="No" />
+    
+    <aura:registerEvent name="refreshCredentials" type="c:MTM_refreshCredentials" />
+    
+    <!-- to Handle page change request by Paginator Component -->
+    <aura:handler event="c:MTM_pageChangeEvent" action="{!c.changePage}" name="changePage" />
+    
+    <!-- to handle action event -->
+    <aura:handler event="c:MTM_actionEvent" action="{!c.handleActionEvent}" />
+    
+    <!-- to handle submit credential response -->
+    <aura:handler event="c:MTM_SubmitCredentialResponse" action="{!c.handleSubmitCredentialResponse}"/>
+    
+    <!-- to fetch records on component load -->
+    <aura:handler name="init" value="{!this}" action="{!c.doInit}" />
+    
+    <!-- to Capture Event by Search Component to Search Records on Search Text 
+    <aura:handler event="c:MTM_searchEvent" name="searchRecords" action="{!c.applySearch}" />
+    <aura:handler name="change" value="{!v.allRecords}" action="{!c.applySearch}"/>
+    <aura:handler event="c:MTM_filterEvent" name="filterRecords" action="{!c.applyFilter}" />-->
+    <aura:handler name="change" value="{!v.filteredrecords}" action="{!c.refreshTable}" />
+    <!-- Loading image component -->
+    <c:MTM_Spinner isVisible="{!v.isLoading}" />
+    
+    <aura:if isTrue="{!v.showClientHierarchy == true}" >
+        <div class="panelContainer">
+            <h2></h2>
+            <div class="panel-group">
+                <div class="panel panel-primary">
+                    <div class="panel-heading">
+                        <div class="imgHeader">
+                            <i class="{!if(v.OverallStatus == 'PENDING CREDENTIAL', 'fa fa-clock-o', '' ) + if(v.OverallStatus == 'APPROVED', 'fa fa-check', '' ) +  if(v.OverallStatus=='', 'fa fa-exclamation-triangle', '' ) + if(and(and(v.OverallStatus != 'APPROVED', v.OverallStatus != 'PENDING CREDENTIAL'), v.OverallStatus != ''), 'fa fa-ban', '' )}" 
+                               aria-hidden="true" 
+                               style="{!'color:'+if(v.OverallStatus == 'PENDING CREDENTIAL', '#48a6f6;', '' ) + if(v.OverallStatus == 'APPROVED', '#93c905;', '' ) + if(v.OverallStatus=='', '#fd9b15;', '' ) + if(and(and(v.OverallStatus != 'APPROVED', v.OverallStatus != 'PENDING CREDENTIAL'), v.OverallStatus != ''), '#fd5050;', '' ) +'display:block;font-size: 34px;'}"></i>
+                            <span class="imgTitle">{!if(v.OverallStatus == 'PENDING CREDENTIAL','PENDING',v.OverallStatus)}</span>
+                        </div>
+                        
+						<!--<img class="img imgHeader" src="" />-->
+                        <div class="panelSubHeader">
+                            <div style="float:left;">
+                                <span class="blockTitle" >{!v.chProviderType.ClientHierarchy__r.Name}</span><br/>
+                                <span class="blockSubTitle" >{!v.chProviderType.ProviderType__r.Name}</span>
+                            </div>
+                            <div style="float:right;">
+                                
+                                <aura:if isTrue="{!v.objectType == $Label.c.MTM_Company}">
+                                    <div aura:id="companyCircle" onclick="{!c.toggleCompanyPanel}" class="{!if(and(v.objectType == $Label.c.MTM_Company, !v.isPanelClosed), 'menu menu-company', 'menu')}">
+                                        <div class="icons">
+                                            <span class="{!if(v.companyApprovedCount==0, 'zeroCount', '')}"><i class="fa fa-check approved" aria-hidden="true"></i> {!if(v.companyApprovedCount==0, '-', v.companyApprovedCount)}</span>
+                                            <span class="{!if(v.companySubmittedCount==0, 'zeroCount', '')}"><i class="fa fa-clock-o submitted" aria-hidden="true"></i> {!if(v.companySubmittedCount==0, '-', v.companySubmittedCount)}</span>
+                                            <span class="{!if(v.companyExpiredCount==0, 'zeroCount', '')}"><i class="fa fa-ban expired" aria-hidden="true"></i> {!if(v.companyExpiredCount==0, '-', v.companyExpiredCount)}</span>
+                                        </div>
+                                        <div class="menu-content">COMPANY CREDENTIALS</div>
+                                        <div class="neck">
+                                            <div class="neck-left">&nbsp;</div>
+                                            <div class="neck-right">&nbsp;</div>
+                                        </div>
+                                    </div>
+                                </aura:if>
+                                
+                                
+                                <!--<aura:if isTrue="{!v.objectType == $Label.c.MTM_Personnel || and(v.objectType == $Label.c.MTM_Company,!v.companyDetailInfo=='Yes')}" > -->
+                                <aura:if isTrue="{!v.objectType == $Label.c.MTM_Personnel || v.objectType == $Label.c.MTM_Company}">
+                                    
+                                    <aura:if isTrue="{!v.companyDetailInfo=='No'}">
+                                        <div aura:id="personnelCircle" onclick="{!c.togglePersonnelPanel}" class="{!if(and(v.objectType == $Label.c.MTM_Personnel, !v.isPanelClosed), 'menu menu-company', 'menu')}">
+                                            <div class="icons">
+                                                <span class="{!if(v.personnelApprovedCount==0, 'zeroCount', '')}"><i class="fa fa-check approved" aria-hidden="true"></i> {!if(v.personnelApprovedCount==0, '-', v.personnelApprovedCount)}</span>
+                                                <span class="{!if(v.personnelSubmittedCount==0, 'zeroCount', '')}"><i class="fa fa-clock-o submitted" aria-hidden="true"></i> {!if(v.personnelSubmittedCount==0, '-', v.personnelSubmittedCount)}</span>
+                                                <span class="{!if(v.personnelExpiredCount==0, 'zeroCount', '')}"><i class="fa fa-ban expired" aria-hidden="true"></i> {!if(v.personnelExpiredCount==0, '-', v.personnelExpiredCount)}</span>
+                                            </div>
+                                            <div class="menu-content">DRIVER STATUS</div>
+                                            <div class="neck">
+                                                <div class="neck-left">&nbsp;</div>
+                                                <div class="neck-right">&nbsp;</div>
+                                            </div>
+                                        </div>
+                                    </aura:if>
+                                </aura:if>
+                                
+                                <aura:if isTrue="{!v.objectType == $Label.c.MTM_Vehicle || v.objectType == $Label.c.MTM_Company}">
+                                    <aura:if isTrue="{!v.companyDetailInfo=='No'}">
+                                        <div aura:id="vehicleCircle" onclick="{!c.toggleVehiclePanel}" class="{!if(and(v.objectType == $Label.c.MTM_Vehicle, !v.isPanelClosed), 'menu menu-company', 'menu')}">
+                                            <div class="icons">
+                                                <span class="{!if(v.vehicleApprovedCount==0, 'zeroCount', '')}"><i class="fa fa-check approved" aria-hidden="true"></i> {!if(v.vehicleApprovedCount==0, '-', v.vehicleApprovedCount)}</span>
+                                                <span class="{!if(v.vehicleSubmittedCount==0, 'zeroCount', '')}"><i class="fa fa-clock-o submitted" aria-hidden="true"></i> {!if(v.vehicleSubmittedCount==0, '-', v.vehicleSubmittedCount)}</span>
+                                                <span class="{!if(v.vehicleExpiredCount==0, 'zeroCount', '')}"><i  class="fa fa-ban expired" aria-hidden="true"></i> {!if(v.vehicleExpiredCount==0, '-', v.vehicleExpiredCount)}</span>
+                                            </div>
+                                            <div class="menu-content">VEHICLE STATUS</div>
+                                            <div class="neck">
+                                                <div class="neck-left">&nbsp;</div>
+                                                <div class="neck-right">&nbsp;</div>
+                                            </div>
+                                        </div>
+                                    </aura:if>
+                                </aura:if>
+                                <aura:if isTrue="{!v.isShowCollapse}">
+                                    <div class="toggleIcon">
+                                        <a class="collapseAnchor" data-type="{!v.objectType}" onclick="{!c.panelToggle}" data-href="#panel1">
+                                            <i aura:id="angleIcon" class="{!if(v.isPanelClosed == true, 'fa fa-angle-down', 'fa fa-angle-up')}" style="font-size:32px;color:white;"></i>
+                                        </a>
+                                    </div>
+                                </aura:if>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="panel-body panelBody" aura:id="contentPanel" id="panel1" style="{!'display: '+if(v.isPanelClosed == true, 'none;', 'block;')}">
+                        <div class="">
+                            <div class="slds-grid slds-wrap slds-grid--pull-padded slds-grid--vertical-align-center filterBlock">
+                                <div class="searchBlock slds-p-horizontal--small slds-size--3-of-5">
+                                    <c:MTM_searchBar aura:id="searchBar" records="{!v.allRecords}" searchResults="{!v.searchedRecords}"
+                                                     placeHolder="{!$Label.c.MTM_CredentialSearchPlaceholder}"
+                                                     searchFields="{!v.searchFields}"/>
+                                </div>
+                                <div class="slds-p-horizontal--small slds-size--1-of-5">
+                                    <c:MTM_filterField aura:id="statusFilter" object="CredentialRequirementStatus__c" field="Status__c" records="{!v.searchedRecords}" filteredResults="{!v.statusFilterRecords}"
+                                                       label="{!$Label.c.MTM_Status}" selectedValue="" mode="="
+                                                       availableValues="[{'label':'All', 'value':''},{'label':'New', 'value':'New'},{'label':'Submitted', 'value':'Submitted'},
+                                                                        {'label':'Approved', 'value':'Approved'}, {'label':'Rejected', 'value':'Rejected'}, {'label':'Expired', 'value':'Expired'}]"
+                                                       />
+                                </div>
+                                <div class="slds-p-horizontal--small slds-size--1-of-5">
+                                    <c:MTM_filterField aura:id="expirationDaysFilter" object="CredentialRequirementStatus__c" field="ExpirationDays__c" records="{!v.statusFilterRecords}" filteredResults="{!v.filteredrecords}"
+                                                       label="Expires Within" selectedValue="" mode="&lt;="
+                                                       availableValues="[{'label':'All', 'value':''},{'label':'30', 'value':'30'},
+                                                                        {'label':'45', 'value':'45'},{'label':'60', 'value':'60'}]"/>
+                                </div>
+                            </div>
+                            <br/>
+                            <!-- Record Table component to display records in the table -->
+                            <div class="slds-scrollable--x">
+                                <table class="credentialsTable slds-table slds-table--bordered slds-table--cell-buffer">
+                                    <thead>
+                                        <tr aura:id="headerRow" class="slds-text-title--caps">
+                                            <th scope="col data-label">
+                                                <div class="slds-truncate" title="Status">
+                                                    <a href="javascript:void(0);" class="sortLink" data-fieldapiname="Status__c" onclick="{!c.sortTable}">Status</a><i style="color:#423f8f;display:inline;" class="fa faSortIcon" aria-hidden="true" />
+                                                </div>
+                                            </th>
+                                            <th scope="col data-label">
+                                                <div class="slds-truncate" title="Credential">
+                                                    <a href="javascript:void(0);" class="sortLink" data-fieldapiname="MasterCredentialName" onclick="{!c.sortTable}">Credential</a> <i style="color:#423f8f;display:inline;" class="fa faSortIcon" aria-hidden="true" />
+                                                </div>
+                                            </th>
+                                            <!--    <aura:if isTrue="{!v.objectType == 'Personnel'}"> 
+                                         <th scope="col data-label">
+                                            <div class="slds-truncate" title="Role">
+                                                <a href="javascript:void(0);" class="sortLink" data-fieldapiname="CredentialRequirementObjectSubtype" onclick="{!c.sortTable}">Role</a> <i style="color:#423f8f;display:inline;" class="fa faSortIcon" aria-hidden="true" />
+                                            </div>
+                                        </th>
+										
+                                        </aura:if> -->
+                                           
+										   <th scope="col data-label">
+                                                <div class="slds-truncate" title="Deadline">
+                                                    <a href="javascript:void(0);" class="sortLink" data-fieldapiname="DeadlineDate__c" onclick="{!c.sortTable}">Deadline</a> <i style="color:#423f8f;display:inline;" class="fa faSortIcon" aria-hidden="true" />
+                                                </div>
+                                            </th>
+											
+                                            <th scope="col data-label">
+                                                <div class="slds-truncate" title="Begin Effective Date">
+                                                    <a href="javascript:void(0);" class="sortLink" data-fieldapiname="EffectiveBeginDate__c" onclick="{!c.sortTable}">Begin <br/> Effective Date</a> <i style="color:#423f8f;display:inline;" class="fa faSortIcon" aria-hidden="true" />
+                                                </div>
+                                            </th>
+											
+                                            <th scope="col data-label">
+                                                <div class="slds-truncate" title="End Effective Date">
+                                                    <a href="javascript:void(0);" class="sortLink" data-fieldapiname="EffectiveEndDate__c" onclick="{!c.sortTable}">End <br/> Effective Date</a> <i style="color:#423f8f;display:inline;" class="fa faSortIcon" aria-hidden="true" />
+                                                </div>
+                                            </th>
+                                            <th scope="col data-label">
+                                                <div class="slds-truncate lastColHeader" title="">
+                                                    Actions
+                                                </div>
+                                            </th>
+											
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <aura:iteration items="{!v.records}" var="record">
+                                            <tr>
+                                                <td>
+                                                    <div class="slds-truncate">
+                                                        <c:MTM_iconHelp iconClass="{!if(record.Status__c == 'New', 'fa fa-clock-o', '')
+                                                                                   +if(record.Status__c == 'Submitted', 'fa fa-clock-o', '')
+                                                                                   +if(record.Status__c == 'Approved', 'fa fa-check', '')
+                                                                                   +if(record.Status__c == 'Rejected', 'fa fa-ban', '')
+                                                                                   +if(record.Status__c == 'Expired', 'fa fa-ban', '')
+                                                                                   +if(record.Status__c == 'Deleted', 'fa fa-trash', '')
+                                                                                   }"
+                                                                        iconColor="{!if(record.Status__c == 'New', '#48a6f6;', '')
+                                                                                   +if(record.Status__c == 'Submitted', '#48a6f6;', '')
+                                                                                   +if(record.Status__c == 'Approved', '#83c20a;', '')
+                                                                                   +if(record.Status__c == 'Rejected', '#fd5050;', '')
+                                                                                   +if(record.Status__c == 'Expired', '#fd5050;', '')
+                                                                                   +if(record.Status__c == 'Deleted', '#789999;', '')
+                                                                                   }"
+                                                                        message1="{!'Status updated to '+record.Status__c+' on '}"
+                                                                        message2="{!record.LastModifiedDate + ' .'}"
+                                                                        message3="Additional information about the reason for the status change possibly."
+                                                                        />
+																		
+                                                        {!record.Status__c}
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div class="slds-truncate">
+                                                        <a data-recordid="{!record.Id}" onclick="{!c.navigateToCredentialDetail}" href="javascript:void(0);">{!record.CredentialRequirement__r.MasterCredential__r.Name}</a>
+                                                    </div>
+                                                </td>
+                                                <!--   <aura:if isTrue="{!v.objectType == 'Personnel'}"> 
+                                             <td>   
+                                               <div class="slds-truncate">
+                                                <ui:outputText value="{!record.CredentialRequirement__r.ObjectSubtype__c}" />
+                                            </div>
+                                                </td>
+                                           </aura:if> -->
+                                                <td>
+                                                    <div class="slds-truncate">
+                                                        <ui:outputDate format="MM/dd/yyyy" value="{!record.DeadlineDate__c}" />
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div class="slds-truncate">
+                                                        <ui:outputDate format="MM/dd/yyyy" value="{!record.EffectiveBeginDate__c}" />
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div class="slds-truncate">
+                                                        <ui:outputDate format="MM/dd/yyyy" value="{!record.EffectiveEndDate__c}" />
+                                                    </div>
+                                                </td>
+                                                <td class="lastColAction">
+                                                    <aura:If isTrue="{!!and(record.Status__c == 'Submitted', record.CredentialInstance__r.Status__c == 'Submitted')}">
+                                                        
+                                                        <c:MTM_recordAction actions="View Credential,Submit Credential"
+                                                                            actionIcons="fa fa-eye,fa fa-upload"
+                                                                            recordId="{!record.Id}"
+                                                                            deactivated="{!if(record.Status__c == 'Inactive', true, false)}" />
+                                                    </aura:If>
+                                                    <aura:If isTrue="{!and(record.Status__c == 'Submitted', record.CredentialInstance__r.Status__c == 'Submitted')}">
+                                                        <c:MTM_recordAction actions="View Credential,Delete Credential"
+                                                                            actionIcons="fa fa-eye,fa fa fa-trash"
+                                                                            recordId="{!record.Id}"	
+                                                                            deactivated="{!if(record.Status__c == 'Inactive', true, false)}" />
+                                                    </aura:If>
+                                                </td>
+                                            </tr>
+                                        </aura:iteration>
+                                    </tbody>
+                                </table>
+                                
+                                <br/>
+                                <!--- Paginator Component -->
+                                <aura:renderIf isTrue="{!v.total>0}">
+                                    <c:MTM_paginator page="{!v.page}" total="{!v.total}" pages="{!v.pages}" pageSize="{!v.pageSize}"></c:MTM_paginator>
+                                </aura:renderIf>
+                                <br/>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <br/>
+    </aura:if>
+    
+</aura:component>
